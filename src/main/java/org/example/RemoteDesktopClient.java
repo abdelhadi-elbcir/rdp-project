@@ -1,4 +1,5 @@
 package org.example;
+
 import java.awt.BorderLayout;
 import java.awt.Graphics;
 import java.awt.Image;
@@ -11,6 +12,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
@@ -35,6 +37,9 @@ public class RemoteDesktopClient extends JFrame {
                         BufferedImage screenImage = ImageIO.read(bais);
                         Image scaledImage = screenImage.getScaledInstance(getWidth(), getHeight(), Image.SCALE_SMOOTH);
                         g.drawImage(scaledImage, 0, 0, null);
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                        JOptionPane.showMessageDialog(RemoteDesktopClient.this, e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -43,11 +48,24 @@ public class RemoteDesktopClient extends JFrame {
         };
         add(screenPanel, BorderLayout.CENTER);
 
-        try {
-            Registry registry = LocateRegistry.getRegistry("localhost", 1099);
-            remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
-        } catch (RemoteException | NotBoundException e) {
-            e.printStackTrace();
+        boolean connected = false;
+        while (!connected) {
+            String password = JOptionPane.showInputDialog(this, "Enter server password:");
+            if (password == null) {
+                System.out.println("Password is required to connect to the server.");
+                System.exit(0);
+            } else {
+                try {
+                    Registry registry = LocateRegistry.getRegistry("localhost", 1099);
+                    remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
+                    connected = remoteDesktop.setPassword(password);
+                    if (!connected) {
+                        JOptionPane.showMessageDialog(this, "Invalid password. Please try again.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (RemoteException | NotBoundException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         new Thread(() -> {
