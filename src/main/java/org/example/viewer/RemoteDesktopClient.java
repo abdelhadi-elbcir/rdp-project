@@ -1,11 +1,11 @@
-package org.example;
+package org.example.viewer;
+
+import org.example.sender.RemoteDesktopInterface;
 
 import java.awt.BorderLayout;
 import java.awt.Graphics;
 import java.awt.Image;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -14,13 +14,17 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import javax.imageio.ImageIO;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.SourceDataLine;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
-public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener {
-    private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
+public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener, KeyListener {
+        private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
     private JPanel screenPanel; // Panel pour afficher l'écran distant
 
     public RemoteDesktopClient() {
@@ -54,7 +58,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         add(screenPanel, BorderLayout.CENTER); // Ajout du panel à la fenêtre
         screenPanel.addMouseListener(this); // Écouteur de clics de souris
         screenPanel.addMouseMotionListener(this); // Écouteur de mouvements de souris
-
+        screenPanel.addKeyListener(this);
         boolean connected = false;
         // Boucle pour se connecter au serveur
         while (!connected) {
@@ -64,7 +68,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 System.exit(0);
             } else {
                 try {
-                    Registry registry = LocateRegistry.getRegistry("localhost", 1099); // Récupération du registre RMI
+                    Registry registry = LocateRegistry.getRegistry("127.0.0.1", 1099); // Récupération du registre RMI
                     remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi"); // Recherche de l'interface distante
                     connected = remoteDesktop.setPassword(password); // Validation du mot de passe
                     if (!connected) {
@@ -138,6 +142,49 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
             remoteDesktop.sendMouseEvent(e.getX(), e.getY(), MouseEvent.NOBUTTON, false); // Envoi de l'événement de mouvement de souris au serveur distant
         } catch (RemoteException ex) {
             ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void keyTyped(KeyEvent e) {
+        // Not implemented
+    }
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        try {
+            remoteDesktop.sendKeyboardEvent(e.getKeyCode(), true);
+        } catch (RemoteException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {
+        try {
+            remoteDesktop.sendKeyboardEvent(e.getKeyCode(), false);
+        } catch (RemoteException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void playAudio() {
+        try {
+            byte[] audioData = remoteDesktop.getAudio();
+            if (audioData != null) {
+                AudioFormat audioFormat = new AudioFormat(44100, 16, 1, true, false);
+                DataLine.Info info = new DataLine.Info(SourceDataLine.class, audioFormat);
+                SourceDataLine sourceDataLine = (SourceDataLine) AudioSystem.getLine(info);
+                sourceDataLine.open(audioFormat);
+                sourceDataLine.start();
+
+                sourceDataLine.write(audioData, 0, audioData.length);
+
+                sourceDataLine.drain();
+                sourceDataLine.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

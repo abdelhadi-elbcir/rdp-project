@@ -1,4 +1,4 @@
-package org.example;
+package org.example.sender;
 
 import java.awt.*;
 import java.awt.event.InputEvent;
@@ -7,22 +7,20 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
 import java.security.SecureRandom;
 import java.util.Base64;
 import javax.imageio.ImageIO;
+import javax.sound.sampled.*;
 import javax.swing.*;
 
-public class RemoteDesktopServer implements RemoteDesktopInterface {
-    private static RemoteDesktopServer instance; // Instance unique du serveur
+public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
+    private static RemoteDesktopInterfaceImpl instance; // Instance unique du serveur
     private String password; // Mot de passe du serveur
     private boolean isConnected; // Indique si le client est connecté
     private Robot robot;
 
     // Constructeur privé pour empêcher l'instanciation directe
-    private RemoteDesktopServer() throws RemoteException {
+    private RemoteDesktopInterfaceImpl() throws RemoteException {
         super(); // Appel au constructeur de la classe mère
         try {
             robot = new Robot();
@@ -44,9 +42,9 @@ public class RemoteDesktopServer implements RemoteDesktopInterface {
     }
 
     // Méthode statique pour récupérer l'instance unique du serveur
-    public static RemoteDesktopServer getInstance() throws RemoteException {
+    public static RemoteDesktopInterfaceImpl getInstance() throws RemoteException {
         if (instance == null) {
-            instance = new RemoteDesktopServer();
+            instance = new RemoteDesktopInterfaceImpl();
         }
         return instance;
     }
@@ -97,24 +95,44 @@ public class RemoteDesktopServer implements RemoteDesktopInterface {
 
     @Override
     public void sendKeyboardEvent(int keyCode, boolean isPressed) throws RemoteException {
-    }
-
-    @Override
-    public void sendAudioData(byte[] audioData) throws RemoteException {
-    }
-
-    // Méthode principale pour démarrer le serveur
-    public static void main(String[] args) {
         try {
-            RemoteDesktopServer server = RemoteDesktopServer.getInstance(); // Récupère l'instance du serveur
-            RemoteDesktopInterface stub = (RemoteDesktopInterface) UnicastRemoteObject.exportObject(server, 0); // Exporte l'objet distant
-
-            Registry registry = LocateRegistry.createRegistry(1099); // Crée le registre RMI
-            registry.rebind("irisi", stub); // Lie l'interface distante au registre
-
-            System.out.println("Remote Desktop Server is running..."); // Message de confirmation du démarrage
-        } catch (Exception e) {
-            e.printStackTrace(); // Affiche les erreurs en cas d'échec du démarrage du serveur
+            if (isPressed) {
+                robot.keyPress(keyCode);
+            } else {
+                robot.keyRelease(keyCode);
+            }
+        } catch (IllegalArgumentException e) {
+            // Handle invalid key codes
+            e.printStackTrace();
         }
     }
+
+
+
+    @Override
+    public byte[] getAudio() throws RemoteException {
+        try {
+            AudioFormat audioFormat = new AudioFormat(44100, 16, 1, true, false);
+            DataLine.Info info = new DataLine.Info(TargetDataLine.class, audioFormat);
+            TargetDataLine targetDataLine = (TargetDataLine) AudioSystem.getLine(info);
+            targetDataLine.open(audioFormat);
+            targetDataLine.start();
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+
+            bytesRead = targetDataLine.read(buffer, 0, buffer.length);
+            if (bytesRead != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+
+            targetDataLine.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 }
