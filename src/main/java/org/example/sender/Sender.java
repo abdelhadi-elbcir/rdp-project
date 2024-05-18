@@ -4,7 +4,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
-public class RemoteDesktopServer {
+public class Sender {
     public static void main(String[] args) {
         try {
             RemoteDesktopInterfaceImpl server = RemoteDesktopInterfaceImpl.getInstance(); // Récupère l'instance du serveur

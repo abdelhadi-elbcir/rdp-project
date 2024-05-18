@@ -188,7 +188,5 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         }
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new RemoteDesktopClient().setVisible(true)); // Création de l'interface utilisateur dans le thread de l'interface Swing
-    }
+
 }
