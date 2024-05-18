@@ -4,8 +4,7 @@ import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.rmi.RemoteException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -93,6 +92,18 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         }
     }
 
+    // Méthodes pour obtenir la résolution de l'écran du serveur
+    @Override
+    public int getScreenWidth() throws RemoteException {
+        return Toolkit.getDefaultToolkit().getScreenSize().width;
+    }
+
+    @Override
+    public int getScreenHeight() throws RemoteException {
+        return Toolkit.getDefaultToolkit().getScreenSize().height;
+    }
+
+
     @Override
     public void sendKeyboardEvent(int keyCode, boolean isPressed) throws RemoteException {
         try {
@@ -134,5 +145,37 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         }
         return null;
     }
+
+
+    @Override
+    public byte[] getFileContent(String filePath) throws RemoteException {
+        try {
+            File file = new File(filePath);
+            if (file.exists()) {
+                FileInputStream fis = new FileInputStream(file);
+                byte[] content = new byte[(int) file.length()];
+                fis.read(content);
+                fis.close();
+                return content;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public void setFileContent(String filePath, byte[] content) throws RemoteException {
+        try {
+            File file = new File(filePath);
+            FileOutputStream fos = new FileOutputStream(file);
+            fos.write(content);
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
 
 }
