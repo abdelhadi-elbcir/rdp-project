@@ -21,9 +21,9 @@ import javax.sound.sampled.SourceDataLine;
 import javax.swing.*;
 
 public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener, KeyListener {
-        private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
+    private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
     private JPanel screenPanel; // Panel pour afficher l'écran distant
-
+    private JPanel buttonsPanel;
     public RemoteDesktopClient() {
         super("Remote Desktop Client");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -53,7 +53,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         add(screenPanel, BorderLayout.CENTER);
 
         // Add buttons panel
-        JPanel buttonsPanel = new JPanel();
+        buttonsPanel = new JPanel();
         buttonsPanel.setLayout(new FlowLayout());
 
         JButton playAudioButton = new JButton("Play Audio");
@@ -159,35 +159,46 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         }
     }
 
-    // Méthode pour envoyer les événements de souris avec mise à l'échelle
     private void sendMouseEventWithScaling(MouseEvent e, boolean isPressed) throws RemoteException {
-        int scaledX = scaleX(e.getX());
-        int scaledY = scaleY(e.getY());
+        // Adjust the point based on insets and component sizes
+        Point dragPoint = e.getPoint();
+        Insets insets = screenPanel.getInsets();
+        int buttonsPanelHeight = buttonsPanel.getHeight();
+        dragPoint.translate(-insets.left, -insets.top - getRootPane().getHeight() + screenPanel.getHeight() - buttonsPanelHeight);
+
+        // Scale the adjusted coordinates
+        int scaledX = scaleX(dragPoint.x);
+        int scaledY = scaleY(dragPoint.y);
+
+        // Send the scaled coordinates and button state to the remote desktop
         remoteDesktop.sendMouseEvent(scaledX, scaledY, e.getButton(), isPressed);
     }
 
-    // Méthodes de mise à l'échelle
+    // Method to scale the X coordinate based on server and client screen widths
     private int scaleX(int x) throws RemoteException {
-        // Calcule la mise à l'échelle en fonction de la résolution de l'écran du serveur
         int serverScreenWidth = remoteDesktop.getScreenWidth();
         int clientScreenWidth = getClientScreenWidth();
         return x * serverScreenWidth / clientScreenWidth;
     }
 
+    // Method to scale the Y coordinate based on server and client screen heights
     private int scaleY(int y) throws RemoteException {
-        // Calcule la mise à l'échelle en fonction de la résolution de l'écran du serveur
         int serverScreenHeight = remoteDesktop.getScreenHeight();
         int clientScreenHeight = getClientScreenHeight();
         return y * serverScreenHeight / clientScreenHeight;
     }
 
+    // Method to get the client's screen width
     private int getClientScreenWidth() {
         return Toolkit.getDefaultToolkit().getScreenSize().width;
     }
 
+    // Method to get the client's screen height
     private int getClientScreenHeight() {
         return Toolkit.getDefaultToolkit().getScreenSize().height;
     }
+
+
 
 
     @Override
