@@ -9,4 +9,7 @@ public interface RemoteDesktopInterface extends Remote {
     void sendKeyboardEvent(int keyCode, boolean isPressed) throws RemoteException;
     int getScreenWidth() throws RemoteException;
     int getScreenHeight() throws RemoteException;
+    void sendFile(String filePath, byte[] fileData) throws RemoteException;
+
+    byte[] receiveFile(String filePath) throws RemoteException;
 }
