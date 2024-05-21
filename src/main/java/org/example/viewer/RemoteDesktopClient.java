@@ -6,23 +6,37 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener, KeyListener {
     private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
     private JPanel screenPanel; // Panel pour afficher l'écran distant
+    JMenuBar menuBar;
 
     public RemoteDesktopClient() {
         super("Remote Desktop Client");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 600);
-        setLocationRelativeTo(null);
+
+        // Set the frame to full screen
+        GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        if (gd.isFullScreenSupported()) {
+            setUndecorated(true); // Remove title bar and borders
+            gd.setFullScreenWindow(this); // Set this frame to full screen
+        } else {
+            System.err.println("Full screen not supported");
+            setSize(800, 600);
+            setLocationRelativeTo(null);
+        }
 
         screenPanel = new JPanel() {
             @Override
@@ -44,6 +58,22 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 }
             }
         };
+
+
+        menuBar = new JMenuBar();
+        JMenu fileMenu = new JMenu("File");
+        JMenuItem sendFileItem = new JMenuItem("Send File");
+        JMenuItem receiveFileItem = new JMenuItem("Receive File");
+
+        sendFileItem.addActionListener(e -> sendFile());
+        receiveFileItem.addActionListener(e -> receiveFile());
+
+        fileMenu.add(sendFileItem);
+        fileMenu.add(receiveFileItem);
+        menuBar.add(fileMenu);
+        setJMenuBar(menuBar);
+
+
         add(screenPanel, BorderLayout.CENTER);
         screenPanel.addMouseListener(this);
         screenPanel.addMouseMotionListener(this);
@@ -58,7 +88,10 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 System.exit(0);
             } else {
                 try {
+
                     Registry registry = LocateRegistry.getRegistry("100.70.33.100", 1099);
+
+
                     remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
                     connected = remoteDesktop.setPassword(password);
                     if (!connected) {
@@ -135,30 +168,35 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
     }
 
     private void sendMouseEventWithScaling(MouseEvent e, boolean isPressed) throws RemoteException {
-        // Get the screen dimensions of the client
         Dimension clientScreenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int clientScreenWidth = clientScreenSize.width;
         int clientScreenHeight = clientScreenSize.height;
 
-        // Get the screen dimensions of the server
         int serverScreenWidth = remoteDesktop.getScreenWidth();
         int serverScreenHeight = remoteDesktop.getScreenHeight();
 
-        // Calculate the scaling factors
         double xScaleFactor = (double) serverScreenWidth / clientScreenWidth;
         double yScaleFactor = (double) serverScreenHeight / clientScreenHeight;
 
-        // Adjust the point based on insets and component sizes
         Point dragPoint = e.getPoint();
         Insets insets = screenPanel.getInsets();
-        int topBarHeight = getRootPane().getHeight() - screenPanel.getHeight();
-        dragPoint.translate(-insets.left, -insets.top - topBarHeight );
+        int menuBarHeight = menuBar.getHeight();
+        int taskBarHeight = Toolkit.getDefaultToolkit().getScreenInsets(getGraphicsConfiguration()).bottom;
 
-        // Scale the coordinates
+        // Calculate a dynamic adjustment factor for Y
+        double yOffsetFactor = 24 + (dragPoint.y / (double) clientScreenHeight) * 25;  // Example scaling factor
+
+        dragPoint.translate(-insets.left, -insets.top - menuBarHeight + (int) yOffsetFactor);
+
+        System.out.println("Original Point: " + dragPoint);
+        System.out.println("Insets: " + insets);
+        System.out.println("Menu Bar Height: " + menuBarHeight);
+        System.out.println("Task Bar Height: " + taskBarHeight);
+
         int scaledX = (int) (dragPoint.x * xScaleFactor);
         int scaledY = (int) (dragPoint.y * yScaleFactor);
+        System.out.println("Scaled X: " + scaledX + ", Scaled Y: " + scaledY);
 
-        // Send the scaled coordinates and button state to the remote desktop
         remoteDesktop.sendMouseEvent(scaledX, scaledY, e.getButton(), isPressed);
     }
 
@@ -188,4 +226,62 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new RemoteDesktopClient().setVisible(true));
     }
+    private void sendFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("All Files", ".");
+        fileChooser.setFileFilter(filter);
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        int result = fileChooser.showOpenDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            String sourceFilePath = selectedFile.getAbsolutePath();
+            String destinationFileName = selectedFile.getName();
+            new FileTransferThread(true, sourceFilePath, destinationFileName).start();
+        }
+    }
+
+    private void receiveFile() {
+        String remoteFilePath = JOptionPane.showInputDialog(this, "Enter the remote file path:");
+        if (remoteFilePath != null && !remoteFilePath.isEmpty()) {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            int result = fileChooser.showSaveDialog(this);
+
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File localFile = fileChooser.getSelectedFile();
+                String localFilePath = localFile.getAbsolutePath();
+                new FileTransferThread(false, remoteFilePath, localFilePath).start();
+            }
+        }
+    }
+
+    private class FileTransferThread extends Thread {
+        private boolean sendMode;
+        private String sourceFilePath;
+        private String destinationFilePath;
+
+        public FileTransferThread(boolean sendMode, String sourceFilePath, String destinationFilePath) {
+            this.sendMode = sendMode;
+            this.sourceFilePath = sourceFilePath;
+            this.destinationFilePath = destinationFilePath;
+        }
+
+        @Override
+        public void run() {
+            try {
+                if (sendMode) {
+                    byte[] fileData = Files.readAllBytes(Paths.get(sourceFilePath));
+                    String destinationPath = destinationFilePath; // Specify the relative path on the server
+                    remoteDesktop.sendFile(destinationPath, fileData);
+                } else {
+                    byte[] fileData = remoteDesktop.receiveFile(sourceFilePath);
+                    Files.write(Paths.get(destinationFilePath), fileData);
+                }
+                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "File transfer completed successfully.", "File Transfer", JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "Error during file transfer: " + e.getMessage(), "File Transfer Error", JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
+            }
+        }}
 }
