@@ -37,8 +37,10 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         SecureRandom random = new SecureRandom();
         byte[] bytes = new byte[16];
         random.nextBytes(bytes);
+
         //password = Base64.getEncoder().encodeToString(bytes);
         password = "1";
+
         System.out.println("Server password: " + password);
         JOptionPane.showMessageDialog(null, "Server password: " + password, "Password Generated", JOptionPane.INFORMATION_MESSAGE);
     }
