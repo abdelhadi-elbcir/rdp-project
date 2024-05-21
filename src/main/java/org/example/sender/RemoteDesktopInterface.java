@@ -7,9 +7,6 @@ public interface RemoteDesktopInterface extends Remote {
     boolean setPassword(String providedPassword) throws RemoteException;
     void sendMouseEvent(int x, int y, int button, boolean isPressed) throws RemoteException;
     void sendKeyboardEvent(int keyCode, boolean isPressed) throws RemoteException;
-    byte[] getAudio() throws RemoteException;
-    byte[] getFileContent(String filePath) throws RemoteException; // New method for file sharing
-    void setFileContent(String filePath, byte[] content) throws RemoteException;
     int getScreenWidth() throws RemoteException;
     int getScreenHeight() throws RemoteException;
 }
