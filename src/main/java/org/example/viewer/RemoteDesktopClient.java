@@ -151,8 +151,13 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         // Adjust the point based on insets and component sizes
         Point dragPoint = e.getPoint();
         Insets insets = screenPanel.getInsets();
-        int topBarHeight = getRootPane().getHeight() - screenPanel.getHeight();
-        dragPoint.translate(-insets.left, -insets.top - topBarHeight );
+        int titleBarHeight = getRootPane().getInsets().top; // Adjust this to ensure it includes the title bar height correctly
+        int taskBarHeight = Toolkit.getDefaultToolkit().getScreenInsets(getGraphicsConfiguration()).bottom; // Adjust for taskbar height
+
+        dragPoint.translate(-insets.left, -insets.top - titleBarHeight);
+
+        // Optionally adjust for taskbar (if applicable) - this depends on the configuration and needs
+        dragPoint.y -= taskBarHeight;
 
         // Scale the coordinates
         int scaledX = (int) (dragPoint.x * xScaleFactor);
