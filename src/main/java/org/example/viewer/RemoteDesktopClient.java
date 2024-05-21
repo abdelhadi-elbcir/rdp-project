@@ -6,17 +6,13 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import javax.imageio.ImageIO;
 import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
 
 public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener, KeyListener {
     private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
@@ -48,20 +44,6 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 }
             }
         };
-
-        JMenuBar menuBar = new JMenuBar();
-        JMenu fileMenu = new JMenu("File");
-        JMenuItem sendFileItem = new JMenuItem("Send File");
-        JMenuItem receiveFileItem = new JMenuItem("Receive File");
-
-        sendFileItem.addActionListener(e -> sendFile());
-        receiveFileItem.addActionListener(e -> receiveFile());
-
-        fileMenu.add(sendFileItem);
-        fileMenu.add(receiveFileItem);
-        menuBar.add(fileMenu);
-        setJMenuBar(menuBar);
-
         add(screenPanel, BorderLayout.CENTER);
         screenPanel.addMouseListener(this);
         screenPanel.addMouseMotionListener(this);
@@ -76,8 +58,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 System.exit(0);
             } else {
                 try {
-                    //Registry registry = LocateRegistry.getRegistry("100.70.37.230", 1099);
-                    Registry registry = LocateRegistry.getRegistry("127.0.0.1", 1099);
+                    Registry registry = LocateRegistry.getRegistry("100.70.33.100", 1099);
                     remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
                     connected = remoteDesktop.setPassword(password);
                     if (!connected) {
@@ -170,13 +151,8 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         // Adjust the point based on insets and component sizes
         Point dragPoint = e.getPoint();
         Insets insets = screenPanel.getInsets();
-        int titleBarHeight = getRootPane().getInsets().top; // Adjust this to ensure it includes the title bar height correctly
-        int taskBarHeight = Toolkit.getDefaultToolkit().getScreenInsets(getGraphicsConfiguration()).bottom; // Adjust for taskbar height
-
-        dragPoint.translate(-insets.left, -insets.top - titleBarHeight);
-
-        // Optionally adjust for taskbar (if applicable) - this depends on the configuration and needs
-        dragPoint.y -= taskBarHeight;
+        int topBarHeight = getRootPane().getHeight() - screenPanel.getHeight();
+        dragPoint.translate(-insets.left, -insets.top - topBarHeight );
 
         // Scale the coordinates
         int scaledX = (int) (dragPoint.x * xScaleFactor);
@@ -209,65 +185,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         }
     }
 
-
-    private void sendFile() {
-        JFileChooser fileChooser = new JFileChooser();
-        FileNameExtensionFilter filter = new FileNameExtensionFilter("All Files", "*.*");
-        fileChooser.setFileFilter(filter);
-        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        int result = fileChooser.showOpenDialog(this);
-
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = fileChooser.getSelectedFile();
-            String sourceFilePath = selectedFile.getAbsolutePath();
-            String destinationFileName = selectedFile.getName();
-            new FileTransferThread(true, sourceFilePath, destinationFileName).start();
-        }
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new RemoteDesktopClient().setVisible(true));
     }
-
-    private void receiveFile() {
-        String remoteFilePath = JOptionPane.showInputDialog(this, "Enter the remote file path:");
-        if (remoteFilePath != null && !remoteFilePath.isEmpty()) {
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            int result = fileChooser.showSaveDialog(this);
-
-            if (result == JFileChooser.APPROVE_OPTION) {
-                File localFile = fileChooser.getSelectedFile();
-                String localFilePath = localFile.getAbsolutePath();
-                new FileTransferThread(false, remoteFilePath, localFilePath).start();
-            }
-        }
-    }
-
-    private class FileTransferThread extends Thread {
-        private boolean sendMode;
-        private String sourceFilePath;
-        private String destinationFilePath;
-
-        public FileTransferThread(boolean sendMode, String sourceFilePath, String destinationFilePath) {
-            this.sendMode = sendMode;
-            this.sourceFilePath = sourceFilePath;
-            this.destinationFilePath = destinationFilePath;
-        }
-
-        @Override
-        public void run() {
-            try {
-                if (sendMode) {
-                    byte[] fileData = Files.readAllBytes(Paths.get(sourceFilePath));
-                    String destinationPath = destinationFilePath; // Specify the relative path on the server
-                    remoteDesktop.sendFile(destinationPath, fileData);
-                } else {
-                    byte[] fileData = remoteDesktop.receiveFile(sourceFilePath);
-                    Files.write(Paths.get(destinationFilePath), fileData);
-                }
-                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "File transfer completed successfully.", "File Transfer", JOptionPane.INFORMATION_MESSAGE);
-            } catch (IOException e) {
-                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "Error during file transfer: " + e.getMessage(), "File Transfer Error", JOptionPane.ERROR_MESSAGE);
-                e.printStackTrace();
-            }
-        }
-    }
-
 }
