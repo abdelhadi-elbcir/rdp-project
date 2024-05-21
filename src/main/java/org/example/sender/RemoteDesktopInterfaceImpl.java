@@ -5,6 +5,8 @@ import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.rmi.RemoteException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -35,8 +37,10 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         SecureRandom random = new SecureRandom();
         byte[] bytes = new byte[16];
         random.nextBytes(bytes);
-        password = Base64.getEncoder().encodeToString(bytes);
-        password = "fatima";
+
+        //password = Base64.getEncoder().encodeToString(bytes);
+        password = "1";
+
         System.out.println("Server password: " + password);
         JOptionPane.showMessageDialog(null, "Server password: " + password, "Password Generated", JOptionPane.INFORMATION_MESSAGE);
     }
@@ -116,6 +120,30 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         } catch (IllegalArgumentException e) {
             // Handle invalid key codes
             e.printStackTrace();
+        }
+    }
+
+
+    @Override
+    public void sendFile(String filePath, byte[] fileData) throws RemoteException {
+        try {
+            File file = new File(filePath);
+            FileOutputStream fos = new FileOutputStream(file);
+            fos.write(fileData);
+            fos.close();
+            System.out.println("File received: " + filePath);
+        } catch (IOException e) {
+            throw new RemoteException("Error sending file: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] receiveFile(String filePath) throws RemoteException {
+        try {
+            File file = new File(filePath);
+            return Files.readAllBytes(Paths.get(file.getAbsolutePath()));
+        } catch (IOException e) {
+            throw new RemoteException("Error receiving file: " + e.getMessage());
         }
     }
 
