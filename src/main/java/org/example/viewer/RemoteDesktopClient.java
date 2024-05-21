@@ -21,12 +21,22 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener, KeyListener {
     private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
     private JPanel screenPanel; // Panel pour afficher l'écran distant
+    JMenuBar menuBar;
 
     public RemoteDesktopClient() {
         super("Remote Desktop Client");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 600);
-        setLocationRelativeTo(null);
+
+        // Set the frame to full screen
+        GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        if (gd.isFullScreenSupported()) {
+            setUndecorated(true); // Remove title bar and borders
+            gd.setFullScreenWindow(this); // Set this frame to full screen
+        } else {
+            System.err.println("Full screen not supported");
+            setSize(800, 600);
+            setLocationRelativeTo(null);
+        }
 
         screenPanel = new JPanel() {
             @Override
@@ -49,7 +59,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
             }
         };
 
-        JMenuBar menuBar = new JMenuBar();
+        menuBar = new JMenuBar();
         JMenu fileMenu = new JMenu("File");
         JMenuItem sendFileItem = new JMenuItem("Send File");
         JMenuItem receiveFileItem = new JMenuItem("Receive File");
@@ -76,8 +86,8 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 System.exit(0);
             } else {
                 try {
-                    //Registry registry = LocateRegistry.getRegistry("100.70.37.230", 1099);
-                    Registry registry = LocateRegistry.getRegistry("127.0.0.1", 1099);
+                    Registry registry = LocateRegistry.getRegistry("100.70.37.230", 1099);
+                    //Registry registry = LocateRegistry.getRegistry("127.0.0.1", 1099);
                     remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
                     connected = remoteDesktop.setPassword(password);
                     if (!connected) {
@@ -173,7 +183,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         int titleBarHeight = getRootPane().getInsets().top; // Adjust this to ensure it includes the title bar height correctly
         int taskBarHeight = Toolkit.getDefaultToolkit().getScreenInsets(getGraphicsConfiguration()).bottom; // Adjust for taskbar height
 
-        dragPoint.translate(-insets.left, -insets.top - titleBarHeight);
+        dragPoint.translate(-insets.left, -insets.top + menuBar.getHeight() + taskBarHeight);
 
         // Optionally adjust for taskbar (if applicable) - this depends on the configuration and needs
         dragPoint.y -= taskBarHeight;
