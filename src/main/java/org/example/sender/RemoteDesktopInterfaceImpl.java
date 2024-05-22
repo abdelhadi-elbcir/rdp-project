@@ -1,5 +1,6 @@
 package org.example.sender;
 
+import javax.sound.sampled.*;
 import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
@@ -11,28 +12,27 @@ import java.rmi.RemoteException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import javax.imageio.ImageIO;
-import javax.sound.sampled.*;
 import javax.swing.*;
 
 public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
-    private static RemoteDesktopInterfaceImpl instance; // Instance unique du serveur
-    private String password; // Mot de passe du serveur
-    private boolean isConnected; // Indique si le client est connecté
+    private static RemoteDesktopInterfaceImpl instance;
+    private String password;
+    private boolean isConnected;
     private Robot robot;
+    private TargetDataLine microphone;
+    private ByteArrayOutputStream audioStream;
 
-    // Constructeur privé pour empêcher l'instanciation directe
     private RemoteDesktopInterfaceImpl() throws RemoteException {
-        super(); // Appel au constructeur de la classe mère
+        super();
         try {
             robot = new Robot();
         } catch (AWTException e) {
             e.printStackTrace();
         }
-        generatePassword(); // Génération du mot de passe au démarrage du serveur
-        isConnected = false; // Initialisation de la connexion à false
+        generatePassword();
+        isConnected = false;
     }
 
-    // Méthode privée pour générer un mot de passe aléatoire
     private void generatePassword() {
         SecureRandom random = new SecureRandom();
         byte[] bytes = new byte[16];
@@ -45,7 +45,6 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         JOptionPane.showMessageDialog(null, "Server password: " + password, "Password Generated", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // Méthode statique pour récupérer l'instance unique du serveur
     public static RemoteDesktopInterfaceImpl getInstance() throws RemoteException {
         if (instance == null) {
             instance = new RemoteDesktopInterfaceImpl();
@@ -55,7 +54,7 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
 
     @Override
     public byte[] captureScreen() throws RemoteException {
-        if (isConnected) { // Vérifie si le client est connecté
+        if (isConnected) {
             try {
                 Robot robot = new Robot();
                 Rectangle screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
@@ -63,7 +62,7 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ImageIO.write(screenCapture, "png", baos);
-                return baos.toByteArray(); // Retourne l'image capturée sous forme de tableau d'octets
+                return baos.toByteArray();
             } catch (IOException | AWTException e) {
                 e.printStackTrace();
             }
@@ -75,14 +74,13 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
 
     @Override
     public boolean setPassword(String providedPassword) throws RemoteException {
-        if (providedPassword.equals(password)) { // Vérifie si le mot de passe fourni est correct
-            isConnected = true; // Établit la connexion
+        if (providedPassword.equals(password)) {
+            isConnected = true;
             return true;
         } else {
-            return false; // Mot de passe incorrect
+            return false;
         }
     }
-
 
     @Override
     public void sendMouseEvent(int x, int y, int button, boolean isPressed) throws RemoteException {
@@ -97,7 +95,6 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         }
     }
 
-    // Méthodes pour obtenir la résolution de l'écran du serveur
     @Override
     public int getScreenWidth() throws RemoteException {
         return Toolkit.getDefaultToolkit().getScreenSize().width;
@@ -108,7 +105,6 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         return Toolkit.getDefaultToolkit().getScreenSize().height;
     }
 
-
     @Override
     public void sendKeyboardEvent(int keyCode, boolean isPressed) throws RemoteException {
         try {
@@ -118,11 +114,9 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
                 robot.keyRelease(keyCode);
             }
         } catch (IllegalArgumentException e) {
-            // Handle invalid key codes
             e.printStackTrace();
         }
     }
-
 
     @Override
     public void sendFile(String filePath, byte[] fileData) throws RemoteException {
@@ -147,5 +141,48 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
         }
     }
 
+    @Override
+    public byte[] startAudioStream() throws RemoteException {
+        if (isConnected) {
+            try {
+                AudioFormat format = new AudioFormat(44100, 16, 2, true, true);
+                DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+                if (!AudioSystem.isLineSupported(info)) {
+                    throw new LineUnavailableException("Line not supported");
+                }
+                microphone = (TargetDataLine) AudioSystem.getLine(info);
+                microphone.open(format);
+                microphone.start();
 
+                audioStream = new ByteArrayOutputStream();
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+
+                while ((bytesRead = microphone.read(buffer, 0, buffer.length)) != -1) {
+                    audioStream.write(buffer, 0, bytesRead);
+                }
+
+                return audioStream.toByteArray();
+            } catch (LineUnavailableException e) {
+                throw new RemoteException("Error starting audio stream: " + e.getMessage());
+            }
+        } else {
+            throw new RemoteException("Connection not established. Please provide the correct password.");
+        }
+    }
+
+    @Override
+    public void stopAudioStream() throws RemoteException {
+        if (microphone != null) {
+            microphone.stop();
+            microphone.close();
+        }
+        if (audioStream != null) {
+            try {
+                audioStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }

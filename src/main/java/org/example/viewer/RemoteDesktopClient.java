@@ -2,6 +2,10 @@ package org.example.viewer;
 
 import org.example.sender.RemoteDesktopInterface;
 
+import javax.imageio.ImageIO;
+import javax.sound.sampled.*;
+import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
@@ -14,29 +18,27 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import javax.imageio.ImageIO;
-import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
 
 public class RemoteDesktopClient extends JFrame implements MouseListener, MouseMotionListener, KeyListener {
-    private RemoteDesktopInterface remoteDesktop; // Interface pour la communication avec le bureau distant
-    private JPanel screenPanel; // Panel pour afficher l'écran distant
-    JMenuBar menuBar;
+    private RemoteDesktopInterface remoteDesktop;
+    private JPanel screenPanel;
+    private JMenuBar menuBar;
+    private TargetDataLine microphone;
+    private boolean isStreamingAudio = false;
 
     public RemoteDesktopClient() {
         super("Remote Desktop Client");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // Set the frame to full screen
         GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-        if (gd.isFullScreenSupported()) {
-            setUndecorated(true); // Remove title bar and borders
-            gd.setFullScreenWindow(this); // Set this frame to full screen
-        } else {
-            System.err.println("Full screen not supported");
-            setSize(800, 600);
-            setLocationRelativeTo(null);
-        }
+        //if (gd.isFullScreenSupported()) {
+        //    setUndecorated(true);
+        //    gd.setFullScreenWindow(this);
+        //} else {
+        System.err.println("Full screen not supported");
+        setSize(800, 600);
+        setLocationRelativeTo(null);
+        //}
 
         screenPanel = new JPanel() {
             @Override
@@ -70,6 +72,18 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         fileMenu.add(sendFileItem);
         fileMenu.add(receiveFileItem);
         menuBar.add(fileMenu);
+
+        JMenu audioMenu = new JMenu("Audio");
+        JMenuItem startAudioStreamItem = new JMenuItem("Start Audio Stream");
+        JMenuItem stopAudioStreamItem = new JMenuItem("Stop Audio Stream");
+
+        startAudioStreamItem.addActionListener(e -> startAudioStream());
+        stopAudioStreamItem.addActionListener(e -> stopAudioStream());
+
+        audioMenu.add(startAudioStreamItem);
+        audioMenu.add(stopAudioStreamItem);
+        menuBar.add(audioMenu);
+
         setJMenuBar(menuBar);
 
         add(screenPanel, BorderLayout.CENTER);
@@ -86,8 +100,8 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
                 System.exit(0);
             } else {
                 try {
-                    Registry registry = LocateRegistry.getRegistry("100.70.37.230", 1099);
-                    //Registry registry = LocateRegistry.getRegistry("127.0.0.1", 1099);
+                    //Registry registry = LocateRegistry.getRegistry("100.70.37.230", 1099);
+                    Registry registry = LocateRegistry.getRegistry("127.0.0.1", 1099);
                     remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
                     connected = remoteDesktop.setPassword(password);
                     if (!connected) {
@@ -111,8 +125,6 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         }).start();
     }
 
-    // Méthodes de l'interface MouseListener
-
     @Override
     public void mouseClicked(MouseEvent e) {
     }
@@ -120,7 +132,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
     @Override
     public void mousePressed(MouseEvent e) {
         try {
-            sendMouseEventWithScaling(e, true); // Envoi de l'événement de clic de souris avec mise à l'échelle
+            sendMouseEventWithScaling(e, true);
         } catch (RemoteException ex) {
             ex.printStackTrace();
         }
@@ -129,7 +141,7 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
     @Override
     public void mouseReleased(MouseEvent e) {
         try {
-            sendMouseEventWithScaling(e, false); // Envoi de l'événement de relâchement de souris avec mise à l'échelle
+            sendMouseEventWithScaling(e, false);
         } catch (RemoteException ex) {
             ex.printStackTrace();
         }
@@ -143,12 +155,10 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
     public void mouseExited(MouseEvent e) {
     }
 
-    // Méthodes de l'interface MouseMotionListener
-
     @Override
     public void mouseDragged(MouseEvent e) {
         try {
-            sendMouseEventWithScaling(e, false); // Envoi de l'événement de déplacement de souris avec mise à l'échelle
+            sendMouseEventWithScaling(e, false);
         } catch (RemoteException ex) {
             ex.printStackTrace();
         }
@@ -157,48 +167,46 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
     @Override
     public void mouseMoved(MouseEvent e) {
         try {
-            sendMouseEventWithScaling(e, false); // Envoi de l'événement de mouvement de souris avec mise à l'échelle
+            sendMouseEventWithScaling(e, false);
         } catch (RemoteException ex) {
             ex.printStackTrace();
         }
     }
 
     private void sendMouseEventWithScaling(MouseEvent e, boolean isPressed) throws RemoteException {
-        // Get the screen dimensions of the client
-        Dimension clientScreenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int clientScreenWidth = clientScreenSize.width;
-        int clientScreenHeight = clientScreenSize.height;
+        boolean isFullScreen = (getExtendedState() == JFrame.MAXIMIZED_BOTH);
 
-        // Get the screen dimensions of the server
+        int panelWidth = screenPanel.getWidth();
+        int panelHeight = screenPanel.getHeight();
+
         int serverScreenWidth = remoteDesktop.getScreenWidth();
         int serverScreenHeight = remoteDesktop.getScreenHeight();
 
-        // Calculate the scaling factors
-        double xScaleFactor = (double) serverScreenWidth / clientScreenWidth;
-        double yScaleFactor = (double) serverScreenHeight / clientScreenHeight;
+        double xScaleFactor = (double) serverScreenWidth / panelWidth;
+        double yScaleFactor = (double) serverScreenHeight / panelHeight;
 
-        // Adjust the point based on insets and component sizes
-        Point dragPoint = e.getPoint();
-        Insets insets = screenPanel.getInsets();
-        int titleBarHeight = getRootPane().getInsets().top; // Adjust this to ensure it includes the title bar height correctly
-        int taskBarHeight = Toolkit.getDefaultToolkit().getScreenInsets(getGraphicsConfiguration()).bottom; // Adjust for taskbar height
+        Point panelPoint = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), screenPanel);
 
-        dragPoint.translate(-insets.left, -insets.top + menuBar.getHeight() + taskBarHeight);
+        if (isFullScreen) {
+            Insets insets = screenPanel.getInsets();
+            int menuBarHeight = menuBar.getHeight();
+            double yOffsetFactor = 24 + (panelPoint.y / (double) panelHeight) * 25;
 
-        // Optionally adjust for taskbar (if applicable) - this depends on the configuration and needs
-        dragPoint.y -= taskBarHeight;
+            panelPoint.translate(-insets.left, -insets.top - menuBarHeight + (int) yOffsetFactor);
+        }
 
-        // Scale the coordinates
-        int scaledX = (int) (dragPoint.x * xScaleFactor);
-        int scaledY = (int) (dragPoint.y * yScaleFactor);
+        int scaledX = (int) (panelPoint.x * xScaleFactor);
+        int scaledY = (int) (panelPoint.y * yScaleFactor);
 
-        // Send the scaled coordinates and button state to the remote desktop
+        System.out.println("Panel Point: " + panelPoint);
+        System.out.println("Scaled X: " + scaledX + ", Scaled Y: " + scaledY);
+        System.out.println("Full Screen: " + isFullScreen);
+
         remoteDesktop.sendMouseEvent(scaledX, scaledY, e.getButton(), isPressed);
     }
 
     @Override
     public void keyTyped(KeyEvent e) {
-        // Not implemented
     }
 
     @Override
@@ -218,7 +226,6 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
             ex.printStackTrace();
         }
     }
-
 
     private void sendFile() {
         JFileChooser fileChooser = new JFileChooser();
@@ -250,34 +257,71 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
         }
     }
 
-    private class FileTransferThread extends Thread {
-        private boolean sendMode;
-        private String sourceFilePath;
-        private String destinationFilePath;
+    private void startAudioStream() {
+        if (isStreamingAudio) {
+            JOptionPane.showMessageDialog(this, "Audio stream is already running.", "Audio Stream", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
 
-        public FileTransferThread(boolean sendMode, String sourceFilePath, String destinationFilePath) {
-            this.sendMode = sendMode;
-            this.sourceFilePath = sourceFilePath;
-            this.destinationFilePath = destinationFilePath;
+        try {
+            remoteDesktop.startAudioStream();
+            isStreamingAudio = true;
+            JOptionPane.showMessageDialog(this, "Audio streaming started.", "Audio Stream", JOptionPane.INFORMATION_MESSAGE);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error starting audio stream: " + e.getMessage(), "Audio Stream Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void stopAudioStream() {
+        if (!isStreamingAudio) {
+            JOptionPane.showMessageDialog(this, "Audio stream is not running.", "Audio Stream", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        try {
+            remoteDesktop.stopAudioStream();
+            isStreamingAudio = false;
+            JOptionPane.showMessageDialog(this, "Audio streaming stopped.", "Audio Stream", JOptionPane.INFORMATION_MESSAGE);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error stopping audio stream: " + e.getMessage(), "Audio Stream Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private class FileTransferThread extends Thread {
+        private boolean sending;
+        private String sourcePath;
+        private String destinationPath;
+
+        public FileTransferThread(boolean sending, String sourcePath, String destinationPath) {
+            this.sending = sending;
+            this.sourcePath = sourcePath;
+            this.destinationPath = destinationPath;
         }
 
         @Override
         public void run() {
             try {
-                if (sendMode) {
-                    byte[] fileData = Files.readAllBytes(Paths.get(sourceFilePath));
-                    String destinationPath = destinationFilePath; // Specify the relative path on the server
+                if (sending) {
+                    byte[] fileData = Files.readAllBytes(Paths.get(sourcePath));
                     remoteDesktop.sendFile(destinationPath, fileData);
                 } else {
-                    byte[] fileData = remoteDesktop.receiveFile(sourceFilePath);
-                    Files.write(Paths.get(destinationFilePath), fileData);
+                    byte[] fileData = remoteDesktop.receiveFile(sourcePath);
+                    Files.write(Paths.get(destinationPath), fileData);
                 }
-                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "File transfer completed successfully.", "File Transfer", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "File transfer complete.", "File Transfer", JOptionPane.INFORMATION_MESSAGE);
             } catch (IOException e) {
-                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "Error during file transfer: " + e.getMessage(), "File Transfer Error", JOptionPane.ERROR_MESSAGE);
                 e.printStackTrace();
+                JOptionPane.showMessageDialog(RemoteDesktopClient.this, "File transfer failed: " + e.getMessage(), "File Transfer Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            RemoteDesktopClient client = new RemoteDesktopClient();
+            client.setVisible(true);
+        });
+    }
 }
