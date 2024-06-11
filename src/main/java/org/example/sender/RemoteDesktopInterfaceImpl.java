@@ -1,10 +1,7 @@
 package org.example.sender;
 
 import java.awt.*;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.UnsupportedFlavorException;
+
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -150,22 +147,7 @@ public class RemoteDesktopInterfaceImpl implements RemoteDesktopInterface {
             throw new RemoteException("Error receiving file: " + e.getMessage());
         }
     }
-    @Override
-    public void copyPath(String text) throws RemoteException {
-        System.out.println(text);
-//        StringSelection stringSelection = new StringSelection(text);
-//        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-//        clipboard.setContents(stringSelection, null);
-//
-//        File file = new File(text);
-//        if (file.exists() && file.isFile()) {
-//            int response = JOptionPane.showConfirmDialog(null, "The copied text is a file path. Do you want to receive this file?", "File Transfer", JOptionPane.YES_NO_OPTION);
-//            if (response == JOptionPane.YES_OPTION) {
-//                byte[] fileData = receiveFile(text);
-//
-//            }
-//        }
-    }
+
 
 
 
