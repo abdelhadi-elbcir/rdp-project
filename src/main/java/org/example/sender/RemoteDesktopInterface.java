@@ -10,6 +10,7 @@ public interface RemoteDesktopInterface extends Remote {
     int getScreenWidth() throws RemoteException;
     int getScreenHeight() throws RemoteException;
     void sendFile(String filePath, byte[] fileData) throws RemoteException;
-
     byte[] receiveFile(String filePath) throws RemoteException;
+    void copyPath(String text) throws RemoteException;
+
 }

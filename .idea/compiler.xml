@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="RDP-APP" />
+        <module name="rdp-project" />
       </profile>
     </annotationProcessing>
   </component>

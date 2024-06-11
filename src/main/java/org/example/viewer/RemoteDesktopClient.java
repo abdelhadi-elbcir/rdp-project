@@ -82,20 +82,20 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
 
         boolean connected = false;
         while (!connected) {
-            String password = JOptionPane.showInputDialog(this, "Enter server password:");
+            String password = JOptionPane.showInputDialog(this, "Saisissrz le code du burreau distant:");
             if (password == null) {
-                System.out.println("Password is required to connect to the server.");
+                System.out.println("Le code du burreau distant est obligatoire.");
                 System.exit(0);
             } else {
                 try {
 
-                    Registry registry = LocateRegistry.getRegistry("100.70.33.100", 1099);
+                    Registry registry = LocateRegistry.getRegistry("100.70.34.108", 1099);
 
 
                     remoteDesktop = (RemoteDesktopInterface) registry.lookup("irisi");
                     connected = remoteDesktop.setPassword(password);
                     if (!connected) {
-                        JOptionPane.showMessageDialog(this, "Invalid password. Please try again.", "Error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(this, "Le code est invalide .", "Erreur", JOptionPane.ERROR_MESSAGE);
                     }
                 } catch (RemoteException | NotBoundException e) {
                     e.printStackTrace();
@@ -188,14 +188,10 @@ public class RemoteDesktopClient extends JFrame implements MouseListener, MouseM
 
         dragPoint.translate(-insets.left, -insets.top - menuBarHeight + (int) yOffsetFactor);
 
-        System.out.println("Original Point: " + dragPoint);
-        System.out.println("Insets: " + insets);
-        System.out.println("Menu Bar Height: " + menuBarHeight);
-        System.out.println("Task Bar Height: " + taskBarHeight);
 
         int scaledX = (int) (dragPoint.x * xScaleFactor);
         int scaledY = (int) (dragPoint.y * yScaleFactor);
-        System.out.println("Scaled X: " + scaledX + ", Scaled Y: " + scaledY);
+
 
         remoteDesktop.sendMouseEvent(scaledX, scaledY, e.getButton(), isPressed);
     }
