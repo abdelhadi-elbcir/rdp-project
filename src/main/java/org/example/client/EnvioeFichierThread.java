@@ -2,6 +2,7 @@ package org.example.client;
 
 import org.example.servicePartage.ServiceIntreface;
 import javax.swing.*;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -45,11 +46,23 @@ public class EnvioeFichierThread extends Thread {
                 byte[] fileData = Files.readAllBytes(Paths.get(source));
                 String chemin = destination;
                 servicePartage.envoieFichier(chemin, fileData);
+                JOptionPane.showMessageDialog(remoteDesktopClient, "Le fichier a été envoyé.", "Transfert fichier", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                byte[] fileData = servicePartage.receiveFile(source);
-                Files.write(Paths.get(destination), fileData);
+                String cheminDistant = servicePartage.ouvrirGestionnaireFichiers();
+                if (cheminDistant != null && !cheminDistant.isEmpty()) {
+                    JFileChooser fileChooser = new JFileChooser();
+                    fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                    int result = fileChooser.showSaveDialog(remoteDesktopClient);
+
+                    if (result == JFileChooser.APPROVE_OPTION) {
+                        File fichierLocal = fileChooser.getSelectedFile();
+                        String cheminLocal = fichierLocal.getAbsolutePath();
+                        byte[] fileData = servicePartage.receiveFile(cheminDistant);
+                        Files.write(Paths.get(cheminLocal), fileData);
+                        JOptionPane.showMessageDialog(remoteDesktopClient, "Le fichier a été reçu.", "Transfert fichier", JOptionPane.INFORMATION_MESSAGE);
+                    }
+                }
             }
-            JOptionPane.showMessageDialog(remoteDesktopClient, "Le fichier a été envoyé.", "Transfert fichier", JOptionPane.INFORMATION_MESSAGE);
         } catch (IOException e) {
             JOptionPane.showMessageDialog(remoteDesktopClient, "Une erreur s'est produite : " + e.getMessage(), "Transfert fichier", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();

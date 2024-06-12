@@ -125,8 +125,8 @@ public class Client extends JFrame implements MouseListener, MouseMotionListener
                 System.exit(0);
             } else {
                 try {
-                    Registry registry = LocateRegistry.getRegistry(dotenv.get("host"), Integer.parseInt(dotenv.get("port")));
-                    servicePartage = (ServiceIntreface) registry.lookup(dotenv.get("stub"));
+                    Registry registry = LocateRegistry.getRegistry("192.168.1.117",1099);
+                    servicePartage = (ServiceIntreface) registry.lookup("irisi");
                     connected = servicePartage.verifierCode(password);
                     if (!connected) {
                         JOptionPane.showMessageDialog(this, "Le code est invalide.", "Erreur", JOptionPane.ERROR_MESSAGE);
@@ -278,18 +278,8 @@ public class Client extends JFrame implements MouseListener, MouseMotionListener
     }
 
     private void receiveFile() throws RemoteException {
-        String cheminDistant = servicePartage.ouvrirGestionnaireFichiers();
-        if (cheminDistant != null && !cheminDistant.isEmpty()) {
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            int result = fileChooser.showSaveDialog(this);
+        new EnvioeFichierThread(false, null, null, servicePartage, this).start();
 
-            if (result == JFileChooser.APPROVE_OPTION) {
-                File fichierLocal = fileChooser.getSelectedFile();
-                String cheminLocal = fichierLocal.getAbsolutePath();
-                new EnvioeFichierThread(false, cheminDistant, cheminLocal, servicePartage, this).start();
-            }
-        }
     }
 
 }
